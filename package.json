@@ -1,0 +1,11 @@
+{
+  "name": "@skycoin4444/cybersecurity-threat-detection",
+  "version": "1.0.0",
+  "description": "Cybersecurity threat detection and incident response system",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "echo 'tests'",
+    "start": "node dist/index.js"
+  }
+}
