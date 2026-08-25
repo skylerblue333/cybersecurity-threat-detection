@@ -44,28 +44,63 @@ const IP_LABEL_PATTERN = /^[A-Fa-f0-9.:]{2,64}$/;
 /**
  * Deterministic, process-local triage for caller-supplied network telemetry.
  * This class never opens sockets, scans a target, blocks traffic, or executes a response.
+ * Events for each source must arrive in nondecreasing timestamp order.
  */
 export class ThreatDetectionEngine {
   private readonly events: NetworkEvent[] = [];
   private readonly threats: ThreatIndicator[] = [];
   private readonly seenEventIds = new Set<string>();
+  private readonly latestTimestampBySource = new Map<string, number>();
   private readonly config: DetectionConfig;
 
   constructor(config: Partial<DetectionConfig> = {}) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
-    if (this.config.maxEvents < 1 || this.config.maxEvents > 100_000) throw new Error('maxEvents out of range');
-    if (this.config.maxIndicators < 1 || this.config.maxIndicators > 100_000) throw new Error('maxIndicators out of range');
-    if (this.config.largeTransferBytes < 1 || !Number.isSafeInteger(this.config.largeTransferBytes)) {
+    const maxEvents = config.maxEvents ?? DEFAULT_CONFIG.maxEvents;
+    const maxIndicators = config.maxIndicators ?? DEFAULT_CONFIG.maxIndicators;
+    const largeTransferBytes = config.largeTransferBytes ?? DEFAULT_CONFIG.largeTransferBytes;
+    const burstWindowMs = config.burstWindowMs ?? DEFAULT_CONFIG.burstWindowMs;
+    const burstCount = config.burstCount ?? DEFAULT_CONFIG.burstCount;
+    const sensitivePorts = new Set(config.sensitivePorts ?? DEFAULT_CONFIG.sensitivePorts);
+
+    if (!Number.isSafeInteger(maxEvents) || maxEvents < 1 || maxEvents > 100_000) {
+      throw new Error('maxEvents out of range');
+    }
+    if (!Number.isSafeInteger(maxIndicators) || maxIndicators < 1 || maxIndicators > 100_000) {
+      throw new Error('maxIndicators out of range');
+    }
+    if (!Number.isSafeInteger(largeTransferBytes) || largeTransferBytes < 1) {
       throw new Error('largeTransferBytes must be a positive safe integer');
     }
-    if (this.config.burstWindowMs < 1 || this.config.burstWindowMs > 3_600_000) throw new Error('burstWindowMs out of range');
-    if (this.config.burstCount < 2 || this.config.burstCount > 10_000) throw new Error('burstCount out of range');
+    if (!Number.isSafeInteger(burstWindowMs) || burstWindowMs < 1 || burstWindowMs > 3_600_000) {
+      throw new Error('burstWindowMs out of range');
+    }
+    if (!Number.isSafeInteger(burstCount) || burstCount < 2 || burstCount > 10_000) {
+      throw new Error('burstCount out of range');
+    }
+    for (const port of sensitivePorts) {
+      if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+        throw new Error('sensitivePorts contains an invalid port');
+      }
+    }
+
+    this.config = {
+      maxEvents,
+      maxIndicators,
+      largeTransferBytes,
+      burstWindowMs,
+      burstCount,
+      sensitivePorts,
+    };
   }
 
   logNetworkEvent(event: NetworkEvent): ThreatIndicator[] {
     this.validateEvent(event);
     if (this.seenEventIds.has(event.id)) throw new Error('duplicate event id');
     if (this.events.length >= this.config.maxEvents) throw new Error('event capacity reached');
+
+    const previousTimestamp = this.latestTimestampBySource.get(event.sourceIP);
+    if (previousTimestamp !== undefined && event.timestamp < previousTimestamp) {
+      throw new Error('out-of-order source timestamp');
+    }
 
     this.events.push({ ...event });
     this.seenEventIds.add(event.id);
@@ -75,6 +110,8 @@ export class ThreatDetectionEngine {
       this.seenEventIds.delete(event.id);
       throw new Error('indicator capacity reached');
     }
+
+    this.latestTimestampBySource.set(event.sourceIP, event.timestamp);
     this.threats.push(...created);
     return created.map((indicator) => ({ ...indicator, eventIds: [...indicator.eventIds] }));
   }
