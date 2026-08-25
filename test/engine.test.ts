@@ -49,6 +49,24 @@ test('detects an exact source burst once at the configured threshold', () => {
   assert.deepEqual(created[0].eventIds, ['evt-1', 'evt-2', 'evt-3']);
 });
 
+test('rejects out-of-order timestamps for the same source', () => {
+  const engine = new ThreatDetectionEngine({ burstCount: 3 });
+  engine.logNetworkEvent(event({ id: 'evt-1', timestamp: 1_200 }));
+  assert.throws(
+    () => engine.logNetworkEvent(event({ id: 'evt-2', timestamp: 1_100 })),
+    /out-of-order source timestamp/,
+  );
+  assert.equal(engine.summary().events, 1);
+});
+
+test('allows independent source clocks while enforcing per-source ordering', () => {
+  const engine = new ThreatDetectionEngine();
+  engine.logNetworkEvent(event({ id: 'evt-1', sourceIP: '10.0.0.1', timestamp: 2_000 }));
+  assert.doesNotThrow(() =>
+    engine.logNetworkEvent(event({ id: 'evt-2', sourceIP: '10.0.0.3', timestamp: 1_000 })),
+  );
+});
+
 test('rejects duplicate and malformed telemetry', () => {
   const engine = new ThreatDetectionEngine();
   engine.logNetworkEvent(event());
@@ -57,6 +75,27 @@ test('rejects duplicate and malformed telemetry', () => {
   assert.throws(
     () => engine.logNetworkEvent(event({ id: 'evt-3', bytesTransferred: -1 })),
     /invalid byte count/,
+  );
+});
+
+test('rejects non-finite and undefined effective capacity values', () => {
+  assert.throws(() => new ThreatDetectionEngine({ maxEvents: Number.NaN }), /maxEvents out of range/);
+  assert.throws(
+    () => new ThreatDetectionEngine({ maxIndicators: Number.NaN }),
+    /maxIndicators out of range/,
+  );
+  const withUndefined = new ThreatDetectionEngine({ maxEvents: undefined });
+  assert.equal(withUndefined.summary().events, 0);
+});
+
+test('snapshots and validates the configured sensitive port set', () => {
+  const ports = new Set([22]);
+  const engine = new ThreatDetectionEngine({ sensitivePorts: ports });
+  ports.add(443);
+  assert.deepEqual(engine.logNetworkEvent(event()), []);
+  assert.throws(
+    () => new ThreatDetectionEngine({ sensitivePorts: new Set([0]) }),
+    /invalid port/,
   );
 });
 
