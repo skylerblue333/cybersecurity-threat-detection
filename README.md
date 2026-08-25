@@ -1,44 +1,59 @@
-<!-- PORTFOLIO PROJECT PROFILE: maintained by the repository owner -->
+# Sky Threat Triage Core
 
-## Project profile and code-audit snapshot
+**Status: engineering beta / defensive security lab.** This repository is a bounded TypeScript library for triaging caller-supplied network-event telemetry with simple deterministic heuristics. It does not monitor networks by itself and does not perform response actions.
 
-**What this is:** **cybersecurity-threat-detection** is a public repository described as: “Core component of SKYCOIN4444 ecosystem. #SkyCoin4444 #AI #Blockchain #DevOps #Innovation” Its dominant language signals are **TypeScript (1 files)**.
+## Implemented
 
-**Why it has value:** Its value is best understood through the implementation evidence currently present in the repository: **6 tracked files** were observed in the shallow audit, with the source structure and existing documentation providing the project’s specific context. This README does not treat a prototype, experiment, or archive as a production system without supporting evidence.
+- strict event ID, address-label, port, protocol, byte-count, and timestamp validation
+- bounded in-memory event and indicator capacity
+- duplicate event rejection
+- configurable sensitive-port heuristic
+- configurable large-transfer heuristic
+- real source-event burst detection within a bounded time window
+- deterministic finding IDs derived from rule and source event
+- severity summaries
+- defensive copies of stored telemetry/results
+- strict TypeScript build and Node built-in tests
+- dependency audit in CI
 
-**Implementation evidence:** No test-related file was detected by filename heuristics.; 1 dependency or package manifest(s) detected; No CI, build, Docker, or infrastructure signal was detected by the audit.; and 2 documentation or governance file(s) detected. Test filenames observed include none detected. Dependency or package files include `package.json`. Build, CI, or infrastructure signals include none detected.
+## Use
 
-**Current status:** The repository is tracked on the `main` branch. The existing source tree, configuration, tests, workflows, and documentation remain authoritative for supported behavior and maturity. A code audit is not a production-readiness certification, and the presence of a test or workflow file does not establish that all checks pass.
+```bash
+npm install --ignore-scripts --no-fund
+npm test
+```
 
-**Relationship to the wider portfolio:** This repository is one focused component of the broader Skyler Blue Spillers portfolio across AI, software engineering, cloud and DevOps, cybersecurity, blockchain, finance, education, social systems, and creative work. It may provide a service boundary, implementation pattern, experiment, archive, or reusable idea for related repositories. Treat repositories as technical dependencies only where documented interfaces and verified project requirements support that relationship.
+```ts
+import { ThreatDetectionEngine } from './src';
 
-**Quality and security note:** No obvious secret-like pattern was detected by the limited static scan; this is not a substitute for a security audit. No TODO/FIXME marker was detected in the scanned text files.
+const engine = new ThreatDetectionEngine();
+engine.logNetworkEvent({
+  id: 'evt-1',
+  sourceIP: '10.0.0.1',
+  destIP: '10.0.0.2',
+  port: 22,
+  protocol: 'tcp',
+  bytesTransferred: 512,
+  timestamp: 1_725_000_000_000,
+});
 
----
+console.log(engine.getThreats());
+```
 
-# Cybersecurity Threat Detection
+## Detection boundary
 
-![GitHub stars](https://img.shields.io/github/stars/skylerblue333/cybersecurity-threat-detection?style=flat-square)
-![GitHub license](https://img.shields.io/github/license/skylerblue333/cybersecurity-threat-detection?style=flat-square)
+These findings are **heuristics**, not proof of an attack. A sensitive-port event is labeled `sensitive_port_access`, not falsely called a port scan. A large transfer alone is not proof of exfiltration. A burst indicator means a configured number of events from one source occurred within the configured time window.
 
-## 🌟 Overview
-**cybersecurity-threat-detection** is a professional-grade project within the **SkyCoin4444** ecosystem. It focuses on delivering high-value solutions in the domain of **TypeScript**.
+The library intentionally has no `respondToThreat`, firewall, quarantine, process-kill, network-scan, credential, exploit, or remote-execution capability.
 
-## 🚀 Key Features
-- **Scalable Architecture**: Designed for enterprise-level growth and performance.
-- **Modern Standards**: Implements best practices for clean code and maintainability.
-- **Robust Integration**: Built to work seamlessly within modern cloud-native environments.
+## SKYCOIN4444 integration
 
-## 🛠️ Technology Stack
-- **Primary Domain**: TypeScript
-- **Ecosystem**: SkyCoin4444 Digital Platform
+Use this core behind a separately authenticated telemetry ingestion boundary for local triage, observability enrichment, or security dashboards. Production integration must add durable event storage, privacy/data-retention policy, trusted sensor identity, time normalization, alert review, false-positive handling, observability, and explicitly authorized response workflows.
 
-## 📂 Structure
-The project is organized into a modular structure to ensure clarity and ease of development.
+## Explicit limitations
 
-## 👨‍💻 Author
-**Skyler Blue Spillers**
-*Professional Chess Player & Software Engineer*
+This is process-local and in-memory. It does not capture packets, open sockets, scan hosts, probe services, query external reputation systems, inspect malware, perform SIEM correlation, use ML, provide threat intelligence, isolate tenants, authenticate callers, maintain durable audit history, deliver alerts, execute incident response, provide HA, or prove production deployment.
 
----
-*Powered by SkyCoin4444*
+A clean result is not a security certification, and a finding is not confirmation of compromise.
+
+See `SECURITY.md` and `CHANGELOG.md`.
