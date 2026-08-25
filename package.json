@@ -1,11 +1,17 @@
 {
-  "name": "@skycoin4444/cybersecurity-threat-detection",
-  "version": "1.0.0",
-  "description": "Cybersecurity threat detection and incident response system",
-  "main": "dist/index.js",
+  "name": "@skycoin4444/threat-triage-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bounded offline TypeScript network-event triage library",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
   "scripts": {
-    "build": "tsc",
-    "test": "echo 'tests'",
-    "start": "node dist/index.js"
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test dist/test/*.test.js",
+    "verify": "npm test"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.2",
+    "typescript": "5.7.2"
   }
 }
